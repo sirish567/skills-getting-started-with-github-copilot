@@ -4,6 +4,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Unregister a participant from an activity
+  async function unregisterParticipant(activityName, email, listItem) {
+    try {
+      const res = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+
+      const result = await res.json();
+
+      if (res.ok) {
+        // Refresh activities so availability and lists update consistently
+        fetchActivities();
+      } else {
+        console.error("Failed to unregister:", result);
+      }
+    } catch (error) {
+      console.error("Error unregistering participant:", error);
+    }
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -31,31 +52,47 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         // Participants section (bulleted list)
-        const participantsDiv = document.createElement("div");
-        participantsDiv.className = "participants";
+          const participantsDiv = document.createElement("div");
+          participantsDiv.className = "participants";
 
-        const participantsTitle = document.createElement("h5");
-        participantsTitle.textContent = "Participants";
-        participantsDiv.appendChild(participantsTitle);
+          const participantsTitle = document.createElement("h5");
+          participantsTitle.textContent = "Participants";
+          participantsDiv.appendChild(participantsTitle);
 
-        const ul = document.createElement("ul");
-        ul.className = "participants-list";
+          const ul = document.createElement("ul");
+          ul.className = "participants-list";
 
-        if (!details.participants || details.participants.length === 0) {
-          const li = document.createElement("li");
-          li.className = "no-participants";
-          li.textContent = "No participants yet";
-          ul.appendChild(li);
-        } else {
-          details.participants.forEach((p) => {
+          if (!details.participants || details.participants.length === 0) {
             const li = document.createElement("li");
-            li.textContent = p;
+            li.className = "no-participants";
+            li.textContent = "No participants yet";
             ul.appendChild(li);
-          });
-        }
+          } else {
+            details.participants.forEach((p) => {
+              const li = document.createElement("li");
+              li.className = "participant-item";
 
-        participantsDiv.appendChild(ul);
-        activityCard.appendChild(participantsDiv);
+              const span = document.createElement("span");
+              span.textContent = p;
+
+              const delBtn = document.createElement("button");
+              delBtn.className = "delete-btn";
+              delBtn.title = "Unregister";
+              delBtn.innerHTML = "✖";
+
+              delBtn.addEventListener("click", async () => {
+                // Optimistically remove from UI; fallback will refresh
+                await unregisterParticipant(name, p, li);
+              });
+
+              li.appendChild(span);
+              li.appendChild(delBtn);
+              ul.appendChild(li);
+            });
+          }
+
+          participantsDiv.appendChild(ul);
+          activityCard.appendChild(participantsDiv);
 
         activitiesList.appendChild(activityCard);
 
@@ -90,11 +127,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        messageDiv.className = "message success";
         signupForm.reset();
+
+        // Refresh activities so the newly-registered participant appears
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        messageDiv.className = "message error";
       }
 
       messageDiv.classList.remove("hidden");
@@ -105,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 5000);
     } catch (error) {
       messageDiv.textContent = "Failed to sign up. Please try again.";
-      messageDiv.className = "error";
+      messageDiv.className = "message error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
     }
